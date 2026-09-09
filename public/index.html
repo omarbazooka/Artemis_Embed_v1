@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Artemis Embed v1 — dense semantic embeddings, similarity and document retrieval." />
+  <title>Artemis Embed v1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="nav shell">
+    <a class="brand" href="#top"><span class="mark">A</span><span>Artemis Embed v1</span></a>
+    <nav>
+      <a href="#playground">Playground</a>
+      <a href="#documents">Documents</a>
+      <a href="#results">Results</a>
+      <a href="/docs" target="_blank" rel="noreferrer">API</a>
+      <a href="https://github.com/omarbazooka/Artemis_Embed_v1" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="eyebrow">MISSION 01 · DENSE TEXT EMBEDDINGS</div>
+      <h1>Semantic geometry<br><span>you can inspect.</span></h1>
+      <p class="lead">A compact English dense embedding model built from ModernBERT-base, trained for semantic similarity and retrieval, with Matryoshka dimensions from 768D down to 128D.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="#playground">Open playground</a>
+        <a class="button ghost" href="/docs" target="_blank">Explore API</a>
+      </div>
+      <div class="model-strip">
+        <div><small>BACKBONE</small><strong>ModernBERT</strong></div>
+        <div><small>POOLING</small><strong>Mean</strong></div>
+        <div><small>TRAINING</small><strong>LoRA + MRL</strong></div>
+        <div><small>DIMENSIONS</small><strong>768 · 512 · 256 · 128</strong></div>
+      </div>
+    </section>
+
+    <section class="pipeline shell">
+      <div class="section-heading"><span>01</span><div><h2>Inference architecture</h2><p>One shared encoder maps text into a normalized semantic space.</p></div></div>
+      <div class="flow">
+        <div class="node"><small>INPUT</small><strong>English text</strong></div><div class="arrow">→</div>
+        <div class="node"><small>ENCODER</small><strong>ModernBERT</strong><em>[B,S,768]</em></div><div class="arrow">→</div>
+        <div class="node"><small>POOL</small><strong>Masked mean</strong><em>[B,768]</em></div><div class="arrow">→</div>
+        <div class="node"><small>MRL</small><strong>Truncate</strong><em>768/512/256/128</em></div><div class="arrow">→</div>
+        <div class="node accent"><small>OUTPUT</small><strong>L2 vector</strong><em>[B,D]</em></div>
+      </div>
+    </section>
+
+    <section id="playground" class="labs shell">
+      <div class="section-heading"><span>02</span><div><h2>Embedding playground</h2><p>Run similarity and semantic retrieval through the Artemis API.</p></div></div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="similarity">Sentence similarity</button>
+        <button class="tab" data-tab="search">Semantic search</button>
+      </div>
+
+      <div class="panel tab-panel active" id="tab-similarity">
+        <div class="grid two">
+          <label>Text A<textarea id="text-a" rows="5">A dog is running through a green park.</textarea></label>
+          <label>Text B<textarea id="text-b" rows="5">A puppy runs outside in the park.</textarea></label>
+        </div>
+        <div class="controls">
+          <label>Dimension<select id="similarity-dimension"><option>768</option><option>512</option><option selected>256</option><option>128</option></select></label>
+          <button class="button primary" id="compare-btn">Compare texts</button>
+        </div>
+        <div class="result metric-result hidden" id="similarity-result">
+          <small>COSINE SIMILARITY</small><strong id="similarity-score">—</strong><span id="similarity-meta"></span>
+        </div>
+      </div>
+
+      <div class="panel tab-panel" id="tab-search">
+        <label>Query<textarea id="search-query" rows="3">How can I reduce vector storage while keeping retrieval quality?</textarea></label>
+        <label>Documents <span class="muted">one document per line</span><textarea id="search-docs" rows="8">Matryoshka embeddings can be truncated to smaller dimensions to reduce vector storage.
+FAISS is a library for efficient nearest-neighbor search.
+Transformers produce contextual token representations.
+Cosine similarity compares the direction of vectors in an embedding space.</textarea></label>
+        <div class="controls">
+          <label>Dimension<select id="search-dimension"><option>768</option><option>512</option><option selected>256</option><option>128</option></select></label>
+          <label>Top K<select id="search-topk"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+          <button class="button primary" id="search-btn">Search</button>
+        </div>
+        <div class="result-list" id="search-results"></div>
+      </div>
+    </section>
+
+    <section id="documents" class="documents shell">
+      <div class="section-heading"><span>03</span><div><h2>Document retrieval</h2><p>Upload a document, index its chunks with 256D Artemis embeddings, then retrieve semantically relevant passages.</p></div></div>
+      <div class="document-grid">
+        <div class="panel">
+          <div class="status-line"><span class="status-dot" id="documents-dot"></span><span id="documents-status">Checking Supabase configuration…</span></div>
+          <label class="upload-zone" for="document-file">
+            <input id="document-file" type="file" accept=".pdf,.txt,.md" />
+            <strong>Choose PDF, TXT or MD</strong>
+            <span>Maximum 5 MB · up to 100 chunks</span>
+          </label>
+          <button class="button primary full" id="upload-btn">Upload & index</button>
+          <div class="upload-info" id="upload-info"></div>
+        </div>
+        <div class="panel">
+          <label>Document ID <span class="muted">filled automatically after upload</span><input id="document-id" placeholder="UUID" /></label>
+          <label>Semantic query<textarea id="document-query" rows="4">What does this document say about embedding compression?</textarea></label>
+          <div class="controls">
+            <label>Top K<select id="document-topk"><option>3</option><option selected>5</option><option>10</option></select></label>
+            <button class="button primary" id="document-query-btn">Retrieve chunks</button>
+          </div>
+          <div class="result-list" id="document-results"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="results shell">
+      <div class="section-heading"><span>04</span><div><h2>Measured development results</h2><p>Controlled project metrics used to select the current v1 checkpoint. These are not presented as final MTEB results.</p></div></div>
+      <div class="score-cards">
+        <article><small>RETRIEVAL R@1</small><strong>0.8675</strong><span>768D</span></article>
+        <article><small>RETRIEVAL MRR</small><strong>0.9095</strong><span>768D</span></article>
+        <article><small>CLASSIFICATION</small><strong>0.872</strong><span>linear probe</span></article>
+        <article><small>CLUSTERING NMI</small><strong>0.5897</strong><span>development suite</span></article>
+      </div>
+      <div class="panel dimension-table">
+        <div class="table-head"><strong>Matryoshka dimension</strong><strong>R@1</strong><strong>MRR</strong><strong>STS</strong><strong>Raw vector bytes*</strong></div>
+        <div><span>768D</span><span>0.8675</span><span>0.9095</span><span>0.3450</span><span>3072</span></div>
+        <div><span>512D</span><span>0.8550</span><span>0.9015</span><span>0.3441</span><span>2048</span></div>
+        <div class="highlight"><span>256D</span><span>0.8275</span><span>0.8833</span><span>0.3309</span><span>1024</span></div>
+        <div><span>128D</span><span>0.8250</span><span>0.8763</span><span>0.3299</span><span>512</span></div>
+        <p class="footnote">*float32 vector payload only. The 256D document index uses ~66.7% less raw vector storage than 768D.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shell">
+    <span>Artemis Embed v1 · Mission 01</span>
+    <div><a href="/docs">API docs</a><a href="https://github.com/omarbazooka/Artemis_Embed_v1">GitHub</a></div>
+  </footer>
+  <div class="toast" id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
