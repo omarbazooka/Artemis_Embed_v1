@@ -1,0 +1,17 @@
+[
+  {
+    "source": "all-nli",
+    "task": "symmetric",
+    "rows": 1633
+  },
+  {
+    "source": "msmarco-bm25",
+    "task": "retrieval",
+    "rows": 1685
+  },
+  {
+    "source": "quora-duplicates",
+    "task": "symmetric",
+    "rows": 1665
+  }
+]
