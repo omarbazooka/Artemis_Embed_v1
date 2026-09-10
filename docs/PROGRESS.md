@@ -3,7 +3,7 @@
 ## Current state
 - Current milestone: Milestone 11 — productization and live integration
 - Current task: Vercel + Kaggle inference + Hugging Face registry + Supabase integration
-- Status: standalone model published, Kaggle inference verified at 768D, Supabase retrieval backend active, and Vercel routing live; final Vercel-to-Kaggle and document end-to-end smoke tests remain
+- Status: standalone model published, Kaggle inference verified at 768D, Supabase retrieval backend active, and Vercel production configured for the Kaggle custom endpoint; POST inference and document end-to-end smoke tests remain
 - Current checkpoint: `lora_mrl_hardneg`
 - Current config: masked mean, LoRA, MRL [768,512,256,128], hard negatives
 - Current dataset version: current development mix; see `reports/data_manifest.json`
@@ -22,7 +22,7 @@
 - Kaggle loaded `Omarbm52/Artemis-Embed-v1` successfully and returned two normalized 768D embeddings in the local smoke test.
 - A temporary Cloudflare quick tunnel exposed the Kaggle `/embed` endpoint for Vercel integration.
 - `scripts/kaggle_inference_server.py`, `requirements-kaggle-inference.txt`, and `docs/KAGGLE_INFERENCE.md` added for reproducibility.
-- Vercel embedding-service messages and model status made provider-agnostic; `/api/health` and `/api/model` now expose the selected inference mode without exposing the endpoint URL.
+- Vercel embedding-service messages and model status made provider-agnostic; `/api/health` and `/api/model` expose the selected inference mode without exposing the endpoint URL.
 - Supabase project `Artemis Embed v1` confirmed `ACTIVE_HEALTHY`.
 - Supabase `vector` + `pgcrypto` extensions enabled.
 - `documents` and `document_chunks` tables created with RLS enabled.
@@ -32,7 +32,8 @@
 - `002_secure_match_rpc.sql` added to set an explicit function search path and restrict RPC execution.
 - pgvector retrieval smoke test passed: a unit-aligned 256D query ranked the aligned chunk with cosine score 1.0 above an orthogonal chunk with score 0.0; smoke-test rows were removed afterward.
 - Vercel project `artemis-embed-v1` created in the Artemis team and production build completed as a Python FastAPI Lambda.
-- Live routing verified with HTTP 200 for `/`, `/api/health`, `/api/model`, and `/docs` before the Kaggle integration deploy.
+- Production deployment `dpl_Cj9F3WGZ2KpTT68e9LWVr8XYAMFD` completed successfully and is aliased to `https://artemis-embed-v1-kappa.vercel.app`.
+- Live `/api/model` after the Kaggle integration deploy returned `hf_model_id=Omarbm52/Artemis-Embed-v1`, `inference_mode=custom_endpoint`, `model_configured=true`, `documents_enabled=true`, and `document_dimension=256`.
 
 ## Runtime contract
 
@@ -44,11 +45,9 @@ Supabase document index: D=256
 ```
 
 ## Next exact task
-1. Redeploy Vercel after setting the current `HF_EMBEDDING_URL` to the live Kaggle `/embed` tunnel URL.
-2. Verify `/api/model` reports `inference_mode=custom_endpoint`.
-3. Run live `/api/embed`, `/api/similarity`, and `/api/search` smoke tests through Vercel.
-4. Upload a small TXT/PDF and verify 256D pgvector document retrieval end-to-end.
-5. If the Kaggle session/tunnel restarts, update `HF_EMBEDDING_URL` in Vercel and redeploy; do not retrain or re-export the model.
+1. Run live `/api/embed`, `/api/similarity`, and `/api/search` POST smoke tests through Vercel while the Kaggle session and tunnel are active.
+2. Upload a small TXT/PDF and verify 256D pgvector document retrieval end-to-end.
+3. If the Kaggle session/tunnel restarts, update `HF_EMBEDDING_URL` in Vercel and redeploy; do not retrain or re-export the model.
 
 ## Integration note
 The Vercel connector can deploy and inspect projects but does not expose an environment-variable write action. The temporary Kaggle tunnel URL therefore has to be entered in the Vercel project settings as `HF_EMBEDDING_URL`; secrets must not be sent through chat or committed to source control.
