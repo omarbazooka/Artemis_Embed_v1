@@ -48,7 +48,7 @@ The strongest tested recipe in this development run is **LoRA + Matryoshka + har
 
 After truncating a Matryoshka embedding, the vector must be **L2-normalized again**. The document index uses 256D vectors, reducing raw float32 vector storage by about 66.7% relative to 768D. Truncation reduces downstream vector storage, bandwidth, similarity-computation cost, and index size; it does not reduce ModernBERT backbone FLOPs.
 
-## Architecture
+## Current application architecture
 
 ```text
 Browser
@@ -58,12 +58,25 @@ HTML / CSS / JavaScript
         ▼
 FastAPI on Vercel
     │            │
-    ▼            ▼
-Hugging Face   Supabase
-Artemis model  Storage + PostgreSQL + pgvector
+    │            └──────────────► Supabase
+    │                             Storage + PostgreSQL + pgvector
+    ▼
+HF_EMBEDDING_URL
+    │
+    ▼
+Cloudflare quick tunnel
+    │
+    ▼
+Kaggle inference runtime
+    │
+    ▼
+Omarbm52/Artemis-Embed-v1
+Hugging Face model registry
 ```
 
-The Vercel function does **not** load PyTorch or the 149M-parameter ModernBERT model. It calls a hosted Artemis embedding endpoint and then performs Matryoshka truncation, L2 normalization, cosine similarity, ranking, and Supabase orchestration.
+The Vercel function does **not** load PyTorch or the 149M-parameter ModernBERT model. The current development runtime loads the published Sentence Transformers model on Kaggle and exposes a temporary `/embed` endpoint through a Cloudflare quick tunnel. Vercel calls that endpoint through `HF_EMBEDDING_URL`, then performs Matryoshka truncation, L2 normalization, cosine similarity, ranking, and Supabase orchestration.
+
+The free Hugging Face `hf-inference` provider does not currently support this custom Artemis model. Hugging Face therefore remains the canonical model registry while Kaggle is the current development inference runtime. The Kaggle/Cloudflare path is temporary and has no uptime guarantee.
 
 ## Hugging Face release
 
@@ -84,6 +97,32 @@ ModernBERT-base
 
 The merge/export code is in `scripts/export_huggingface.py`; `scripts/verify_hf_parity.py` compares the adapter path against the merged export before publication.
 
+## Kaggle inference runtime
+
+The repository includes a reproducible remote inference server:
+
+```text
+scripts/kaggle_inference_server.py
+requirements-kaggle-inference.txt
+docs/KAGGLE_INFERENCE.md
+```
+
+The runtime contract is:
+
+```text
+List[str]
+  -> Artemis SentenceTransformer
+  -> normalized [B, 768]
+  -> JSON List[List[float]]
+```
+
+Vercel receives the full vector and applies the selected Matryoshka dimension:
+
+```text
+[B,768] -> [:,:D] -> [B,D] -> L2 normalize
+D ∈ {768,512,256,128}
+```
+
 ## Web application
 
 The application supports three model workflows:
@@ -98,7 +137,7 @@ Artemis Embed v1 is an embedding model, not a generative LLM. Document retrieval
 
 | Method | Route | Purpose |
 |---|---|---|
-| GET | `/api/health` | Service health |
+| GET | `/api/health` | Service health and inference mode |
 | GET | `/api/model` | Model/deployment metadata |
 | POST | `/api/embed` | Create embeddings |
 | POST | `/api/similarity` | Cosine similarity between two texts |
@@ -113,10 +152,10 @@ The production routing has been smoke-tested with HTTP 200 responses for `/`, `/
 
 ```bash
 HF_MODEL_ID=Omarbm52/Artemis-Embed-v1
-HF_EMBEDDING_URL=
-HF_TOKEN=...
+HF_EMBEDDING_URL=https://<temporary-tunnel>.trycloudflare.com/embed
+HF_TOKEN=
 
-SUPABASE_URL=https://tansaxtdjkdtmewtmuvu.supabase.co
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_BUCKET=artemis-documents
 
@@ -125,13 +164,13 @@ MAX_DOCUMENT_CHUNKS=100
 DOCUMENT_EMBEDDING_DIMENSION=256
 ```
 
-`HF_EMBEDDING_URL` is optional. If supplied, the API calls that hosted endpoint directly. Otherwise it builds the Hugging Face inference URL from `HF_MODEL_ID`.
+`HF_EMBEDDING_URL` takes precedence over the Hugging Face router URL derived from `HF_MODEL_ID`. The current public Kaggle endpoint does not require `HF_TOKEN`; keep a token only when a future remote endpoint requires authentication.
 
-`HF_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` are server-only secrets. They must never be committed or exposed to browser JavaScript.
+`SUPABASE_SERVICE_ROLE_KEY` is a server-only secret and must never be committed or exposed to browser JavaScript.
 
 ## Supabase retrieval backend
 
-The production Supabase project is configured with:
+The Supabase project is configured with:
 
 - `documents` and `document_chunks` tables;
 - `extensions.vector(256)` embeddings;
@@ -162,13 +201,14 @@ cp .env.example .env
 uvicorn app:app --reload
 ```
 
-## Reports
+## Reports and documentation
 
 - `reports/experiment_results.csv` — experiment comparison.
 - `reports/matryoshka_quality.csv` — dimension-specific evaluation.
 - `reports/data_manifest.json` — data sources included in the current development run.
 - `reports/training_config.json` — exported training configuration.
 - `docs/ARCHITECTURE.md` — application architecture.
+- `docs/KAGGLE_INFERENCE.md` — current inference-runtime procedure.
 - `docs/PROGRESS.md` — current exact implementation state.
 
 ## Research status and limitations
@@ -186,11 +226,12 @@ The published model is the current **v1 development release**, not a final resea
 - [x] teacher-alignment experiment
 - [x] Matryoshka dimensions 768/512/256/128
 - [x] standalone Sentence Transformers model published to Hugging Face
+- [x] reproducible Kaggle inference server
 - [x] FastAPI application
 - [x] Supabase Storage + pgvector retrieval backend
 - [x] Vercel production deployment and routing smoke test
-- [ ] configure production inference/database secrets in Vercel
-- [ ] run live embedding/similarity/search/document end-to-end smoke tests
+- [ ] complete live Vercel -> Kaggle embedding/similarity/search smoke tests
+- [ ] complete live document upload/query smoke test
 - [ ] run final MTEB English v2 evaluation
 - [ ] complete final data-license/leakage audit
 
