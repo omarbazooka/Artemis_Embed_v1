@@ -102,7 +102,7 @@ async function checkStatus() {
       $("documents-status").textContent = `Supabase + Artemis ready · ${info.document_dimension}D index`;
     } else {
       dot.classList.add("bad");
-      $("documents-status").textContent = "Document retrieval needs Hugging Face + Supabase environment variables";
+      $("documents-status").textContent = "Document retrieval needs Artemis remote inference + Supabase configuration";
     }
   } catch {
     $("documents-dot").classList.add("bad");
