@@ -23,6 +23,14 @@ app = FastAPI(
 )
 
 
+def _inference_mode() -> str | None:
+    if settings.hf_embedding_url:
+        return "custom_endpoint"
+    if settings.hf_model_id:
+        return "hf_inference_router"
+    return None
+
+
 @app.get("/api/health")
 async def health():
     return {
@@ -30,6 +38,7 @@ async def health():
         "service": "Artemis Embed v1",
         "version": __version__,
         "model_configured": settings.model_configured,
+        "inference_mode": _inference_mode(),
         "documents_enabled": settings.supabase_configured and settings.model_configured,
     }
 
@@ -44,6 +53,7 @@ async def model_info():
         "normalization": "L2 after Matryoshka truncation",
         "training_recipe": "LoRA + contrastive + hard negatives + Matryoshka",
         "hf_model_id": settings.hf_model_id or None,
+        "inference_mode": _inference_mode(),
         "model_configured": settings.model_configured,
         "documents_enabled": settings.supabase_configured and settings.model_configured,
         "document_dimension": settings.document_embedding_dimension,
@@ -110,7 +120,7 @@ async def upload_document(file: UploadFile = File(...)):
     if not settings.supabase_configured:
         raise HTTPException(status_code=503, detail="Supabase document storage is not configured")
     if not settings.model_configured:
-        raise HTTPException(status_code=503, detail="Hugging Face model inference is not configured")
+        raise HTTPException(status_code=503, detail="Artemis remote inference is not configured")
 
     filename = _safe_filename(file.filename or "document")
     if Path(filename).suffix.lower() not in SUPPORTED_EXTENSIONS:
